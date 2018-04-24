@@ -3,17 +3,15 @@ import com.gargoylesoftware.htmlunit.html.*;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class YellowPages {
     public static void main(String[] args) throws Exception {
-        getIndustryName();
+        //getIndustryName();
 
-        //handleSpecifyIndustry("http://trangvangvietnam.com/categories/23910/ngan_hang.html");
+        handleSpecifyIndustry("http://trangvangvietnam.com/categories/23910/ngan_hang.html");
         //WebClient webClient = new WebClient();
         //getComanyDetailInfo(webClient,"http://trangvangvietnam.com/listings/1187759913/chi_nhanh_cong_ty_tnhh_tm_dv_hoa_binh_phat.html");
     }
@@ -22,36 +20,59 @@ public class YellowPages {
         MySQLUtils util = new MySQLUtils();
         ArrayList<Category> industries = util.getAllIndustries();
         for(Category c : industries) {
-            handleSpecifyIndustry(c.Url, c.CategoryId, c.MaxPageNumber);
+            handleSpecifyIndustry(c.Url);
         }
 
     }
 
-    private static void handleSpecifyIndustry(String url, String category, Integer crawledPageNumber) {
+    private static void handleSpecifyIndustry(String url) {
         WebClient webClient = new WebClient();
         MySQLUtils util = new MySQLUtils();
         try {
             System.out.println(url);
-            Integer maxPageNumber = getPaging(webClient, url);
-            if(crawledPageNumber > maxPageNumber)
-                return;
-            System.out.println(maxPageNumber);
-            for (int i = 1; i <= maxPageNumber - crawledPageNumber; i++) {
-                if( i == maxPageNumber - crawledPageNumber)
-                    util.updateMaxPage(maxPageNumber, category);
-                if(handleEachPageInIndustry(webClient, url, i, category)) {
-                    util.updateMaxPage(maxPageNumber, category);
-                    return;
-                }
-
-            }
+            getGroupProduct(webClient, url);
+//            if(crawledPageNumber > maxPageNumber)
+//                return;
+//            System.out.println(maxPageNumber);
+//            for (int i = 1; i <= maxPageNumber - crawledPageNumber; i++) {
+//                if( i == maxPageNumber - crawledPageNumber)
+//                    util.updateMaxPage(maxPageNumber, category);
+//                if(handleEachPageInIndustry(webClient, url, i, category)) {
+//                    util.updateMaxPage(maxPageNumber, category);
+//                    return;
+//                }
+//
+//            }
         }
         catch (IOException ex) {System.out.println(ex.getMessage());}
-        catch (SQLException ex) {System.out.println(ex.getMessage());}
+        //catch (SQLException ex) {System.out.println(ex.getMessage());}
         finally {
             webClient.close();
         }
         System.out.println("x");
+    }
+
+    private static void getGroupProduct(WebClient webClient, String url) throws IOException {
+        HtmlPage containerIndustryPage = webClient.getPage(url);
+        List<DomNode> elements = containerIndustryPage.getElementById("newlocnganhnghe").getChildNodes();
+        List<String> cities = new ArrayList<>();
+        HashMap<Integer, String> elementsMap = new HashMap<Integer, String>();
+        int index = 0;
+        for(DomNode element : elements) {
+            if (!element.asText().isEmpty()) {
+                index += 1;
+
+                try {
+                    HtmlAnchor link = (HtmlAnchor) element.getChildNodes().get(0);
+                    elementsMap.put(index, link.getHrefAttribute());
+                } catch (Exception e) {
+                    elementsMap.put(index, element.asText());
+                }
+            }
+        }
+        for(Map.Entry<Integer, String> entry : elementsMap.entrySet()) {
+            System.out.println(entry.getKey() + " " + entry.getValue());
+        }
     }
 
     private static boolean handleEachPageInIndustry(WebClient webClient, String url, int pageNumber, String category) throws IOException, SQLException {

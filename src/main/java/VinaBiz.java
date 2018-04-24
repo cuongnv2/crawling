@@ -40,7 +40,7 @@ public class VinaBiz {
 
             System.out.println(maxPageNumber);
             for (int i = 1; i <= maxPageNumber; i++) {
-                handleEachPageInIndustry(webClient, url, i, category);
+               // handleEachPageInIndustry(webClient, url, i, category);
 
             }
         }
