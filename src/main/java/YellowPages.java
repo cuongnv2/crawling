@@ -1,5 +1,8 @@
+import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.css.StyleElement;
 import com.gargoylesoftware.htmlunit.html.*;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -8,10 +11,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class YellowPages {
+    /*
+    * 1. Lay danh sach industry (hay la category)
+    * 2. Voi moi industry lay ra danh sach cac city
+    * 3. Voi moi city lay ra tat ca cong ty
+    * */
+    static Integer count = 0;
     public static void main(String[] args) throws Exception {
         //getIndustryName();
-
-        handleSpecifyIndustry("http://trangvangvietnam.com/categories/23910/ngan_hang.html");
+        Helper.setupLogging();
+        handleSpecifyIndustry("http://trangvangvietnam.com/categories/486229/album_anh_vat_tu_va_thiet_bi.html", "album anh");
         //WebClient webClient = new WebClient();
         //getComanyDetailInfo(webClient,"http://trangvangvietnam.com/listings/1187759913/chi_nhanh_cong_ty_tnhh_tm_dv_hoa_binh_phat.html");
     }
@@ -20,17 +29,22 @@ public class YellowPages {
         MySQLUtils util = new MySQLUtils();
         ArrayList<Category> industries = util.getAllIndustries();
         for(Category c : industries) {
-            handleSpecifyIndustry(c.Url);
+            handleSpecifyIndustry(c.Url, c.CategoryName);
         }
 
     }
 
-    private static void handleSpecifyIndustry(String url) {
-        WebClient webClient = new WebClient();
+    private static void handleSpecifyIndustry(String url, String categoryName) {
+        WebClient webClient = new WebClient(BrowserVersion.CHROME);
+        webClient.getOptions().setJavaScriptEnabled(false);
         MySQLUtils util = new MySQLUtils();
         try {
             System.out.println(url);
-            getGroupProduct(webClient, url);
+            ArrayList<City> cityUrls = getCitiesForEachIndustry(webClient, url);
+            for(City cityUrl: cityUrls) {
+                handleEachCityInSpecificIndustry(webClient, cityUrl.Url, cityUrl.CityName, categoryName);
+            }
+
 //            if(crawledPageNumber > maxPageNumber)
 //                return;
 //            System.out.println(maxPageNumber);
@@ -46,39 +60,25 @@ public class YellowPages {
         }
         catch (IOException ex) {System.out.println(ex.getMessage());}
         //catch (SQLException ex) {System.out.println(ex.getMessage());}
-        finally {
+        catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
             webClient.close();
         }
         System.out.println("x");
     }
 
-    private static void getGroupProduct(WebClient webClient, String url) throws IOException {
-        HtmlPage containerIndustryPage = webClient.getPage(url);
-        List<DomNode> elements = containerIndustryPage.getElementById("newlocnganhnghe").getChildNodes();
-        List<String> cities = new ArrayList<>();
-        HashMap<Integer, String> elementsMap = new HashMap<Integer, String>();
-        int index = 0;
-        for(DomNode element : elements) {
-            if (!element.asText().isEmpty()) {
-                index += 1;
-
-                try {
-                    HtmlAnchor link = (HtmlAnchor) element.getChildNodes().get(0);
-                    elementsMap.put(index, link.getHrefAttribute());
-                } catch (Exception e) {
-                    elementsMap.put(index, element.asText());
-                }
-            }
-        }
-        for(Map.Entry<Integer, String> entry : elementsMap.entrySet()) {
-            System.out.println(entry.getKey() + " " + entry.getValue());
-        }
+    private static void handleEachCityInSpecificIndustry(WebClient webClient, String cityUrl, String cityName, String category) throws IOException, SQLException {
+        Integer maxPage = getPaging(webClient, cityUrl);
+        for (int i = 1; i <= maxPage; i++)
+            handleEachPageInCity(webClient, cityUrl, i, cityName, category);
+        System.out.println("max page" + cityUrl + " " + maxPage);
     }
 
-    private static boolean handleEachPageInIndustry(WebClient webClient, String url, int pageNumber, String category) throws IOException, SQLException {
+    private static boolean handleEachPageInCity(WebClient webClient, String url, int pageNumber, String cityName, String category) throws IOException, SQLException {
         HtmlPage containerIndustryPage = webClient.getPage(url + "?page=" + pageNumber);
         DomNodeList<DomElement> h2Tags = containerIndustryPage.getElementsByTagName("h2");
-        Integer count = 0;
+
         for(DomElement h2 : h2Tags) {
             HtmlHeading2 h2Tag = (HtmlHeading2) h2;
             if (h2Tag.getAttribute("class").equalsIgnoreCase("company_name")){
@@ -86,8 +86,7 @@ public class YellowPages {
                 for(DomElement link : links) {
                     count += 1;
                     String company_link = ((HtmlAnchor) link).getHrefAttribute();
-                    if(getComanyDetailInfo(webClient, company_link, category))
-                        return true;
+                    getComanyDetailInfo(webClient, company_link, category);
                     System.out.println("downloaded " + count);
                 }
             }
@@ -95,12 +94,50 @@ public class YellowPages {
         return false;
     }
 
-    private static boolean getComanyDetailInfo(WebClient webClient, String companyLink, String category) throws IOException, SQLException {
+    private static ArrayList<City> getCitiesForEachIndustry(WebClient webClient, String url) throws IOException {
+        HtmlPage containerIndustryPage = webClient.getPage(url);
+        List<DomNode> elements = containerIndustryPage.getElementById("newlocnganhnghe").getChildNodes();
+        LinkedHashMap<Integer, City> elementsMap = new LinkedHashMap<Integer, City>(); // Makesure order.
+        int index = 0;
+        int cityIndex = 0;
+
+        for(DomNode element : elements) {
+            if (!element.asText().isEmpty()) {
+                index += 1;
+
+                try {
+                    HtmlAnchor link = (HtmlAnchor) element.getChildNodes().get(0);
+                    elementsMap.put(index, new City(link.asText(), link.getHrefAttribute()));
+                } catch (Exception e) {
+                    elementsMap.put(index, new City(element.asText(), ""));
+                }
+            }
+        }
+        for(Map.Entry<Integer, City> entry : elementsMap.entrySet()) {
+            if (entry.getValue().CityName.toLowerCase().equalsIgnoreCase("tỉnh/ thành phố")) {
+                cityIndex = entry.getKey();
+                break;
+            }
+        }
+
+        ArrayList<City> cityUrls = new ArrayList<City>();
+        for(Map.Entry<Integer, City> entry : elementsMap.entrySet()) {
+            if (entry.getKey() > cityIndex && !entry.getValue().Url.contains("http:"))
+                break;
+            if (entry.getKey() > cityIndex && entry.getValue().Url.contains("http:"))
+                cityUrls.add(new City(entry.getValue().CityName, entry.getValue().Url));
+        }
+        return cityUrls;
+    }
+
+
+
+    private static void getComanyDetailInfo(WebClient webClient, String companyLink, String category) throws IOException, SQLException {
         try {
             String companyId = extractDigitsFromString(companyLink);
             MySQLUtils util = new MySQLUtils();
-            if (util.checkCompanyExists(companyId))
-                return true;
+//            if (util.checkCompanyExists(companyId))
+//                return ;
             HtmlPage companyDetailPage = webClient.getPage(companyLink);
             Iterable<DomElement> basic_info = companyDetailPage.getElementById("listing_basic_info").getChildElements();
             String companyName = "";
@@ -172,13 +209,13 @@ public class YellowPages {
                     soluongnhanvien = div.getNextSibling().getNextSibling().asText();
                 }
             }
-            util.insertCompanyDetail(companyName, email, phone, fax, website, masothue, address, namthanhlap, thitruongchinh,
-                    soluongnhanvien, loaihinhcongty, companyLink, companyId);
+//            util.insertCompanyDetail(companyName, email, phone, fax, website, masothue, address, namthanhlap, thitruongchinh,
+//                    soluongnhanvien, loaihinhcongty, companyLink, companyId);
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
         }
-        return false;
+        return ;
     }
 
     public static String extractDigitsFromString(String url) {
@@ -208,10 +245,14 @@ public class YellowPages {
         DomElement pagingDiv = containerPage.getElementById("paging");
         Iterable<DomElement> pagingLinks = pagingDiv.getChildElements();
         List<Integer> pageNumber = new ArrayList<Integer>();
-        for(DomElement link: pagingLinks) {
-            String href = ((HtmlAnchor) link).getHrefAttribute();
-            if (!extractDigitsFromString(href).equalsIgnoreCase("")) {
-                pageNumber.add(Integer.parseInt(extractDigitsFromString(href)));
+        for(DomElement pagingLink: pagingLinks) {
+            HtmlAnchor link = (HtmlAnchor) pagingLink;
+
+            if (StringUtils.isNumeric(link.asText())) {
+                String href = link.getHrefAttribute();
+                if (!extractDigitsFromString(href).equalsIgnoreCase("")) {
+                    pageNumber.add(Integer.parseInt(extractDigitsFromString(href)));
+                }
             }
         }
         webClient.close();
@@ -226,10 +267,13 @@ public class YellowPages {
         String url = "";
         String category = "";
         for(HtmlAnchor link : links) {
-            if (link.getStyleMap().get("color") != null && link.getStyleMap().get("color").getValue().equalsIgnoreCase("#00C")) {
-                //"http://trangvangvietnam.com/categories/25960/ac_quy_nha_cung_cap_ac_quy.html"
+            StyleElement style = link.getStyleMap().get("color");
+            if (style != null &&
+                    (style.getValue().equalsIgnoreCase("#00C") ||
+                    style.getValue().equalsIgnoreCase("#333"))) {
                 url = link.getHrefAttribute().toString();
                 category = extractDigitsFromString(url);
+                System.out.println(url);
                 if(!util.checkCategoryExists(category))
                     util.insertCategory(category, url);
             }
@@ -237,7 +281,9 @@ public class YellowPages {
     }
 
     private static void getIndustryName() throws IOException, SQLException {
-        WebClient webClient = new WebClient();
+        WebClient webClient = new WebClient(BrowserVersion.CHROME);
+        webClient.getOptions().setJavaScriptEnabled(false);
+
         try {
             webClient.getOptions().setJavaScriptEnabled(false);
             webClient.getOptions().setThrowExceptionOnScriptError(false);

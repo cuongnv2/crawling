@@ -245,12 +245,13 @@ public class MySQLUtils {
         ArrayList<Category> categories = new ArrayList<Category>();
         try {
             Class.forName(driver);
-            String sql ="SELECT url,category_id, max_page FROM category where max_page=0";
+            String sql ="SELECT url,category_id, max_page, name FROM category where max_page=0";
             PreparedStatement statement =
                     connection.prepareStatement(sql);
             ResultSet result = statement.executeQuery();
             while (result.next())
-                 categories.add(new Category(result.getString(1), result.getString(2), result.getInt(3)));
+                 categories.add(new Category(result.getString(1), result.getString(2)
+                         , result.getInt(3), result.getString(4)));
 
         }
         catch (SQLException e) {
