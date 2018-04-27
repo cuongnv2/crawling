@@ -7,16 +7,16 @@ import java.util.List;
  * Created by CuongNguyen on 05/07/2017.
  */
 public class MySQLUtils {
-//    String url = "jdbc:mysql://127.0.0.1:3306/cp";
-//    //String url = "jdbc:mysql://127.0.0.1:3306/crawling";
-//    String driver = "com.mysql.jdbc.Driver";
-//    String username = "root";
-//    String password = "123@123a";
-
-    String url = "jdbc:mysql://127.0.0.1:3306/crawling";
+    String url = "jdbc:mysql://127.0.0.1:3306/cp";
+    //String url = "jdbc:mysql://127.0.0.1:3306/crawling";
     String driver = "com.mysql.jdbc.Driver";
     String username = "root";
-    String password = "123456";
+    String password = "123@123a";
+
+//    String url = "jdbc:mysql://127.0.0.1:3306/crawling";
+//    String driver = "com.mysql.jdbc.Driver";
+//    String username = "root";
+//    String password = "123456";
 
     public void insertShare(int companyId,
                             int session,

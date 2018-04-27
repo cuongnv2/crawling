@@ -24,15 +24,15 @@ public class VinaBiz {
 
     }
 
-    public static void getCityName() throws IOException {
+    public static void getCityName() throws IOException, SQLException {
         WebClient webClient = new WebClient(BrowserVersion.CHROME);
         webClient.getOptions().setJavaScriptEnabled(false);
-
-        HtmlPage containerIndustryPage = webClient.getPage("https://vinabiz.org/categories/tinhthanh");
-        List<HtmlAnchor> links = containerIndustryPage.getByXPath("//div[@class='widget-body no-padding padding-left-5 padding-bottom-5 padding-right-5 padding-top-5']//a");
-        for(HtmlAnchor link: links) {
-            System.out.println(link);
-        }
+        getPaging(webClient, "https://vinabiz.org/categories/tinhthanh/ha-noi/310030003100");
+//        HtmlPage containerIndustryPage = webClient.getPage("https://vinabiz.org/categories/tinhthanh");
+//        List<HtmlAnchor> links = containerIndustryPage.getByXPath("//div[@class='widget-body no-padding padding-left-5 padding-bottom-5 padding-right-5 padding-top-5']//a");
+//        for(HtmlAnchor link: links) {
+//            System.out.println(link);
+//        }
     }
     private static void handleSpecifyIndustry(String url, String category) {
         System.out.println("Processing an industry " + url );
@@ -133,13 +133,26 @@ public class VinaBiz {
         System.out.println("nganh nghe " + nganh_nghe);
     }
 
+    // Keep it has reason.
+//    public static Integer getPaging(WebClient webClient, String url) throws IOException, SQLException {
+//        HtmlPage containerPage = webClient.getPage(url);
+//        List<HtmlAnchor> links = containerPage.getByXPath("//li[@class='PagedList-skipToLast']//a");
+//        Integer pageNumber = Integer.parseInt(extractPagingNumberFromString(links.get(0).getHrefAttribute().toString()));
+//
+//        webClient.close();
+//        return pageNumber;
+//    }
 
     public static Integer getPaging(WebClient webClient, String url) throws IOException, SQLException {
         HtmlPage containerPage = webClient.getPage(url);
-        List<HtmlAnchor> links = containerPage.getByXPath("//li[@class='PagedList-skipToLast']//a");
-        Integer pageNumber = Integer.parseInt(extractPagingNumberFromString(links.get(0).getHrefAttribute().toString()));
-
-        webClient.close();
+        List<HtmlAnchor> links = containerPage.getByXPath("//li[@class='disabled PagedList-pageCountAndLocation']//a");
+        Integer pageNumber = 0;
+        try {
+            String tmp = links.get(0).asText().split(" ")[3].toString();
+            pageNumber = Integer.parseInt(tmp.substring(0, tmp.length() - 1));
+        }
+        catch(Exception e) {}
+        //webClient.close();
         return pageNumber;
     }
 

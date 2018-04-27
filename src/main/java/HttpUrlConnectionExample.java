@@ -164,12 +164,12 @@ public class HttpUrlConnectionExample {
                     if (companyId == 0)
                         companyId = util.insertCompany(fileName.trim().replace(".csv", ""));
 
-                    if (processingType.equalsIgnoreCase("daily") && count > 1) return;
-                    if (processingType.equalsIgnoreCase("daily") && count == 1 && !share[1].equalsIgnoreCase(currentDate)) return;
-//                    //if (processingType.equalsIgnoreCase("daily") && count == 2 && !share[1].equalsIgnoreCase("20180404")) return;
-//                    if (processingType.equalsIgnoreCase("daily") && count > 2) return;
+//                    if (processingType.equalsIgnoreCase("daily") && count > 1) return;
 //                    if (processingType.equalsIgnoreCase("daily") && count == 1 && !share[1].equalsIgnoreCase(currentDate)) return;
-//                    if (processingType.equalsIgnoreCase("daily") && count == 2 && !share[1].equalsIgnoreCase("20180406")) return;
+//                    //if (processingType.equalsIgnoreCase("daily") && count == 2 && !share[1].equalsIgnoreCase("20180404")) return;
+                    if (processingType.equalsIgnoreCase("daily") && count > 2) return;
+                    if (processingType.equalsIgnoreCase("daily") && count == 1 && !share[1].equalsIgnoreCase(currentDate)) return;
+                    if (processingType.equalsIgnoreCase("daily") && count == 2 && !share[1].equalsIgnoreCase("20180426")) return;
                     util.insertShare(companyId,
                             Integer.parseInt(share[1]), // session
                             Double.parseDouble(share[2]), // open_fix
