@@ -1,8 +1,10 @@
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.*;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,39 +16,37 @@ import java.util.regex.Pattern;
  * Created by cuongnguyen on 4/23/18.
  */
 public class VinaBiz {
+    static Integer count = 0;
     public static void main(String[] args) throws Exception {
         getCityName();
-        Helper.setupLogging();
+        //Helper.setupLogging();
 
         //handleSpecifyIndustry("https://vinabiz.org/categories/business/nong-nghiep-lam-nghiep-thuy-san/300031003000300030003000", "thuy san");
         //WebClient webClient = new WebClient();
         //getComanyDetailInfo(webClient,"http://trangvangvietnam.com/listings/1187759913/chi_nhanh_cong_ty_tnhh_tm_dv_hoa_binh_phat.html");
-
+        //getPageContent();
     }
 
     public static void getCityName() throws IOException, SQLException {
         WebClient webClient = new WebClient(BrowserVersion.CHROME);
         webClient.getOptions().setJavaScriptEnabled(false);
-        getPaging(webClient, "https://vinabiz.org/categories/tinhthanh/ha-noi/310030003100");
-//        HtmlPage containerIndustryPage = webClient.getPage("https://vinabiz.org/categories/tinhthanh");
-//        List<HtmlAnchor> links = containerIndustryPage.getByXPath("//div[@class='widget-body no-padding padding-left-5 padding-bottom-5 padding-right-5 padding-top-5']//a");
-//        for(HtmlAnchor link: links) {
-//            System.out.println(link);
-//        }
+
+        HtmlPage containerIndustryPage = webClient.getPage("https://vinabiz.org/categories/tinhthanh");
+        List<HtmlAnchor> links = containerIndustryPage.getByXPath("//div[@class='widget-body no-padding padding-left-5 padding-bottom-5 padding-right-5 padding-top-5']//a");
+        for(HtmlAnchor link: links) {
+            handleSpecifyCity(link.getHrefAttribute(), link.getChildNodes().get(1).asText());
+        }
     }
-    private static void handleSpecifyIndustry(String url, String category) {
-        System.out.println("Processing an industry " + url );
+    private static void handleSpecifyCity(String url, String cityName) {
+        System.out.println("Processing an city " + url );
         WebClient webClient = new WebClient(BrowserVersion.CHROME);
         webClient.getOptions().setJavaScriptEnabled(false);
-        //MySQLUtils util = new MySQLUtils();
+        webClient.getOptions().setCssEnabled(false);
         try {
-            System.out.println(url);
-            Integer maxPageNumber; //= getPaging(webClient, url);
-            maxPageNumber = 1;
-            System.out.println(maxPageNumber);
+            Integer maxPageNumber = getPaging(webClient, url);
+            System.out.println("max page" + maxPageNumber);
             for (int i = 1; i <= maxPageNumber; i++) {
-               handleEachPageInIndustry(webClient, url, i, category);
-
+               handleEachPageInCity(webClient, url, i, cityName);
             }
         }
         catch (IOException ex) {System.out.println(ex.getMessage());}
@@ -54,83 +54,98 @@ public class VinaBiz {
         finally {
             webClient.close();
         }
-        System.out.println("x");
+
     }
 
-    private static boolean handleEachPageInIndustry(WebClient webClient, String url, int pageNumber, String category) throws IOException, SQLException {
+    private static void handleEachPageInCity(WebClient webClient, String url, int pageNumber, String cityName) throws IOException, SQLException {
         if (url.substring(url.length() - 1).equalsIgnoreCase("/"))
             url = url + pageNumber;
         else
             url = url + "/" + pageNumber;
 
         String vinaBiz = "https://vinabiz.org/";
+        url = vinaBiz + url;
 
         HtmlPage containerIndustryPage = webClient.getPage(url);
         List<HtmlAnchor> links  = containerIndustryPage.getByXPath("//div[@class='col-md-12 padding-left-0']//h4//a");
-//        for(HtmlAnchor link : links) {
-//            getComanyDetailInfo(webClient, link.toString(), category);
-//        }
-        getComanyDetailInfo(webClient,"https://vinabiz.org/company/detail/cong-ty-tnhh-xay-dung-tran-quang-minh/3400360030003100350031003300390038003000", "test");
-
-        return false;
+        for(HtmlAnchor link : links) {
+            getComanyDetailInfo(webClient, vinaBiz + link.getHrefAttribute(), cityName);
+        }
     }
 
-    private static void getComanyDetailInfo(WebClient webClient, String url, String category) throws IOException {
-        HtmlPage comapnyPage = webClient.getPage(url);
-        List<HtmlTable> tables = comapnyPage.getByXPath("//div[@class='table-responsive']//table");
-        String ten_chinh_thuc = "";
-        String ten_giao_dich = "";
-        String ma_so_thue = "";
-        String ngay_cap = "";
-        String co_quan_thue = "";
-        String ngay_bat_dau_hoat_dong = "";
-        String trang_thai = "";
-        String dia_chi_tru_so = "";
-        String nganh_nghe = "";
-        if (tables.size() > 0) {
-            HtmlTable table = tables.get(0);
-            for (HtmlTableRow row : table.getRows()) {
-                List<HtmlTableCell> cells = row.getCells();
-                for (int i =0; i < cells.size(); i++) {
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("tên chính thức")) {
-                        ten_chinh_thuc = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("tên giao dịch")) {
-                        ten_giao_dich = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("mã doanh nghiệp")) {
-                        ma_so_thue = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("ngày cấp")) {
-                        ngay_cap = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("cơ quan thuế quản lý")) {
-                        co_quan_thue = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("ngày bắt đầu hoạt động")) {
-                        ngay_bat_dau_hoat_dong = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("trạng thái")) {
-                        trang_thai = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("địa chỉ trụ sở")) {
-                        dia_chi_tru_so = cells.get(i + 1).asText();
-                    }
-                    if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("ngành nghề chính")) {
-                        nganh_nghe = cells.get(i + 1).asText();
+    private static void getComanyDetailInfo(WebClient webClient, String url, String cityName) throws IOException {
+        try {
+            String companyId = extractDigitsFromString(url);
+            MySQLUtils util = new MySQLUtils();
+            if (util.checkCompanyExists(companyId, "vinabiz_company_detail"))
+                return;
+
+            HtmlPage comapnyPage = webClient.getPage(url);
+            List<HtmlTable> tables = comapnyPage.getByXPath("//div[@class='table-responsive']//table");
+            String ten_chinh_thuc = "";
+            String ten_giao_dich = "";
+            String ma_so_thue = "";
+            String ngay_cap = "";
+            String co_quan_thue = "";
+            String ngay_bat_dau_hoat_dong = "";
+            String trang_thai = "";
+            String dia_chi_tru_so = "";
+            String nganh_nghe = "";
+            if (tables.size() > 0) {
+                HtmlTable table = tables.get(0);
+                for (HtmlTableRow row : table.getRows()) {
+                    List<HtmlTableCell> cells = row.getCells();
+                    for (int i = 0; i < cells.size(); i++) {
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("tên chính thức")) {
+                            ten_chinh_thuc = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("tên giao dịch")) {
+                            ten_giao_dich = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("mã doanh nghiệp")) {
+                            ma_so_thue = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("ngày cấp")) {
+                            ngay_cap = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("cơ quan thuế quản lý")) {
+                            co_quan_thue = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("ngày bắt đầu hoạt động")) {
+                            ngay_bat_dau_hoat_dong = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("trạng thái")) {
+                            trang_thai = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("địa chỉ trụ sở")) {
+                            dia_chi_tru_so = cells.get(i + 1).asText();
+                        }
+                        if (cells.get(i).asText().toLowerCase().equalsIgnoreCase("ngành nghề chính")) {
+                            nganh_nghe = cells.get(i + 1).asText();
+                        }
                     }
                 }
             }
+//            System.out.println("ten chinh thuc" + ten_chinh_thuc);
+//            System.out.println("ten giao dich  " + ten_giao_dich);
+//            System.out.println("ma so thue " + ma_so_thue);
+//            System.out.println("ngay cap " + ngay_cap);
+//            System.out.println("co quan thue " + co_quan_thue);
+//            System.out.println("ngay_bat_dau_hoat_dong " + ngay_bat_dau_hoat_dong);
+//            System.out.println("trang_thai " + trang_thai);
+//            System.out.println("dia_chi_tru_so " + dia_chi_tru_so);
+//            System.out.println("nganh nghe " + nganh_nghe);
+
+            util.insertVinaBizCompanyDetail(ten_chinh_thuc, ten_giao_dich, ma_so_thue, ngay_cap,
+                    co_quan_thue, ngay_bat_dau_hoat_dong, trang_thai, dia_chi_tru_so, nganh_nghe, companyId, cityName);
+            count += 1;
+            System.out.println("downloaded" + count);
         }
-        System.out.println("ten chinh thuc" + ten_chinh_thuc);
-        System.out.println("ten giao dich  " + ten_giao_dich);
-        System.out.println("ma so thue " + ma_so_thue);
-        System.out.println("ngay cap " + ngay_cap);
-        System.out.println("co quan thue " + co_quan_thue);
-        System.out.println("ngay_bat_dau_hoat_dong " + ngay_bat_dau_hoat_dong);
-        System.out.println("trang_thai " + trang_thai);
-        System.out.println("dia_chi_tru_so " + dia_chi_tru_so);
-        System.out.println("nganh nghe " + nganh_nghe);
+        catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+
+
     }
 
     // Keep it has reason.
@@ -144,6 +159,8 @@ public class VinaBiz {
 //    }
 
     public static Integer getPaging(WebClient webClient, String url) throws IOException, SQLException {
+        String vinaBiz = "https://vinabiz.org";
+        url = vinaBiz + url;
         HtmlPage containerPage = webClient.getPage(url);
         List<HtmlAnchor> links = containerPage.getByXPath("//li[@class='disabled PagedList-pageCountAndLocation']//a");
         Integer pageNumber = 0;
@@ -158,5 +175,38 @@ public class VinaBiz {
 
     public static String extractPagingNumberFromString(String url) {
         return url.substring(url.lastIndexOf("/") + 1, url.length());
+    }
+
+    public static String extractDigitsFromString(String url) {
+        String pattern = "(\\d)+";
+        Pattern r = Pattern.compile(pattern);
+        Matcher m = r.matcher(url);
+        if (m.find()) {
+            return m.group();
+        }
+        return "";
+    }
+
+
+    public static void getPageContent() throws IOException {
+        WebClient webClient = new WebClient(BrowserVersion.CHROME);
+        webClient.getOptions().setJavaScriptEnabled(true);
+        webClient.getOptions().setCssEnabled(false);
+        webClient.getOptions().setThrowExceptionOnScriptError(false);
+        HtmlPage page = webClient.getPage("https://tomatos-store.com/");
+        WebResponse response = page.getWebResponse();
+        String content = response.getContentAsString();
+        String pageContent =page.asXml();
+        //System.out.println(pageContent);
+        int index = pageContent.lastIndexOf("pixelIds");
+        int lastIndex = pageContent.indexOf("]", index);
+        System.out.println(pageContent.substring(index, lastIndex));
+
+//        PrintWriter out = new PrintWriter("tomato.txt");
+//
+//
+//        out.println(pageContent);
+
+
     }
 }

@@ -2,7 +2,9 @@ import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.css.StyleElement;
 import com.gargoylesoftware.htmlunit.html.*;
+import com.gargoylesoftware.htmlunit.javascript.host.Console;
 import org.apache.commons.lang3.StringUtils;
+import org.w3c.dom.html.HTMLDivElement;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -18,11 +20,17 @@ public class YellowPages {
     * */
     static Integer count = 0;
     public static void main(String[] args) throws Exception {
-        //getIndustryName();
+        handleIndustries();
         Helper.setupLogging();
-        handleSpecifyIndustry("http://trangvangvietnam.com/categories/486229/album_anh_vat_tu_va_thiet_bi.html", "album anh");
+        //getComanyDetailInfoFix(32, "http://trangvangvietnam.com/listings/1187743935/chuoi_ac_quy_powerland_cong_ty_co_phan_xuat_nhap_khau_thien_thai.html");
+        //handleSpecifyIndustry("http://trangvangvietnam.com/categories/486229/album_anh_vat_tu_va_thiet_bi.html", "album anh");
         //WebClient webClient = new WebClient();
         //getComanyDetailInfo(webClient,"http://trangvangvietnam.com/listings/1187759913/chi_nhanh_cong_ty_tnhh_tm_dv_hoa_binh_phat.html");
+//        MySQLUtils util = new MySQLUtils();
+//        List<Company> companies = util.getCompanies();
+//        for(Company company: companies) {
+//            getComanyDetailInfoFix(company.Id, company.Url);
+//        }
     }
 
     private static void handleIndustries() throws SQLException {
@@ -45,18 +53,6 @@ public class YellowPages {
                 handleEachCityInSpecificIndustry(webClient, cityUrl.Url, cityUrl.CityName, categoryName);
             }
 
-//            if(crawledPageNumber > maxPageNumber)
-//                return;
-//            System.out.println(maxPageNumber);
-//            for (int i = 1; i <= maxPageNumber - crawledPageNumber; i++) {
-//                if( i == maxPageNumber - crawledPageNumber)
-//                    util.updateMaxPage(maxPageNumber, category);
-//                if(handleEachPageInIndustry(webClient, url, i, category)) {
-//                    util.updateMaxPage(maxPageNumber, category);
-//                    return;
-//                }
-//
-//            }
         }
         catch (IOException ex) {System.out.println(ex.getMessage());}
         //catch (SQLException ex) {System.out.println(ex.getMessage());}
@@ -86,7 +82,7 @@ public class YellowPages {
                 for(DomElement link : links) {
                     count += 1;
                     String company_link = ((HtmlAnchor) link).getHrefAttribute();
-                    getComanyDetailInfo(webClient, company_link, category);
+                    getComanyDetailInfo(webClient, company_link, category, cityName);
                     System.out.println("downloaded " + count);
                 }
             }
@@ -130,14 +126,50 @@ public class YellowPages {
         return cityUrls;
     }
 
+    private static void getComanyDetailInfoFix(Integer id, String companyLink) throws IOException, SQLException {
+        try {
+            WebClient webClient = new WebClient(BrowserVersion.CHROME);
+            webClient.getOptions().setJavaScriptEnabled(false);
+            webClient.getOptions().setCssEnabled(false);
+            HtmlPage companyDetailPage = webClient.getPage(companyLink);
+            String nguoi_lien_he = "";
+            String chuc_vu = "";
+            String di_dong = "";
+            String email = "";
+            String dien_thoai = "";
+            List<DomElement> divs = companyDetailPage.getByXPath("//div[@class='lienhe_trangchitiet']//div[@class='dong_lienhe']");
+            for(DomNode div: divs) {
+                List<DomNode> elements = div.getChildNodes();
+                for (DomNode element: elements) {
+                    if(element.asText().equalsIgnoreCase("người liên hệ:"))
+                         nguoi_lien_he = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("chức vụ:"))
+                        chuc_vu = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("di động:"))
+                        di_dong = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("email:"))
+                        email = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("điện thoại:"))
+                        dien_thoai = element.getNextElementSibling().asText();
+                }
+            }
 
+            MySQLUtils util = new MySQLUtils();
+            util.updateCompanyDetail(id, nguoi_lien_he, chuc_vu, di_dong, email, dien_thoai);
+            count += 1;
+            System.out.println("updated " + count);
 
-    private static void getComanyDetailInfo(WebClient webClient, String companyLink, String category) throws IOException, SQLException {
+        }catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    private static void getComanyDetailInfo(WebClient webClient, String companyLink, String category, String cityName) throws IOException, SQLException {
         try {
             String companyId = extractDigitsFromString(companyLink);
             MySQLUtils util = new MySQLUtils();
-//            if (util.checkCompanyExists(companyId))
-//                return ;
+            if (util.checkCompanyExists(companyId, "company_detail"))
+                return ;
             HtmlPage companyDetailPage = webClient.getPage(companyLink);
             Iterable<DomElement> basic_info = companyDetailPage.getElementById("listing_basic_info").getChildElements();
             String companyName = "";
@@ -150,6 +182,11 @@ public class YellowPages {
             String website = "";
             String thitruongchinh = "";
             String masothue = "";
+            String nguoi_lien_he = "";
+            String chuc_vu = "";
+            String di_dong = "";
+            String email_lh = "";
+            String dien_thoai = "";
 
             for (DomElement elem : basic_info) {
                 if (elem.getAttribute("class").equalsIgnoreCase("tencongty")) {
@@ -209,13 +246,31 @@ public class YellowPages {
                     soluongnhanvien = div.getNextSibling().getNextSibling().asText();
                 }
             }
-//            util.insertCompanyDetail(companyName, email, phone, fax, website, masothue, address, namthanhlap, thitruongchinh,
-//                    soluongnhanvien, loaihinhcongty, companyLink, companyId);
+
+            List<DomElement> divs_lh = companyDetailPage.getByXPath("//div[@class='lienhe_trangchitiet']//div[@class='dong_lienhe']");
+            for(DomNode div: divs_lh) {
+                List<DomNode> elements = div.getChildNodes();
+                for (DomNode element: elements) {
+                    if(element.asText().equalsIgnoreCase("người liên hệ:"))
+                        nguoi_lien_he = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("chức vụ:"))
+                        chuc_vu = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("di động:"))
+                        di_dong = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("email:"))
+                        email_lh = element.getNextElementSibling().asText();
+                    if(element.asText().equalsIgnoreCase("điện thoại:"))
+                        dien_thoai = element.getNextElementSibling().asText();
+                }
+            }
+
+            util.insertCompanyDetail(companyName, email, phone, fax, website, masothue, address, namthanhlap, thitruongchinh,
+                soluongnhanvien, loaihinhcongty, companyLink, companyId, category, cityName,
+                    nguoi_lien_he, chuc_vu, di_dong, email_lh, dien_thoai);
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
         }
-        return ;
     }
 
     public static String extractDigitsFromString(String url) {
@@ -241,21 +296,30 @@ public class YellowPages {
     }
 
     public static Integer getPaging(WebClient webClient, String url) throws IOException, SQLException {
-        HtmlPage containerPage = webClient.getPage(url);
-        DomElement pagingDiv = containerPage.getElementById("paging");
-        Iterable<DomElement> pagingLinks = pagingDiv.getChildElements();
         List<Integer> pageNumber = new ArrayList<Integer>();
-        for(DomElement pagingLink: pagingLinks) {
-            HtmlAnchor link = (HtmlAnchor) pagingLink;
+        try {
+            HtmlPage containerPage = webClient.getPage(url);
+            DomElement pagingDiv = containerPage.getElementById("paging");
+            Iterable<DomElement> pagingLinks = pagingDiv.getChildElements();
 
-            if (StringUtils.isNumeric(link.asText())) {
-                String href = link.getHrefAttribute();
-                if (!extractDigitsFromString(href).equalsIgnoreCase("")) {
-                    pageNumber.add(Integer.parseInt(extractDigitsFromString(href)));
+            for (DomElement pagingLink : pagingLinks) {
+                HtmlAnchor link = (HtmlAnchor) pagingLink;
+
+                if (StringUtils.isNumeric(link.asText())) {
+                    String href = link.getHrefAttribute();
+                    if (!extractDigitsFromString(href).equalsIgnoreCase("")) {
+                        pageNumber.add(Integer.parseInt(extractDigitsFromString(href)));
+                    }
                 }
             }
+        } catch(Exception e) {
+            System.out.println("getPaging " + e.getMessage());
+            return 0;
         }
-        webClient.close();
+        finally {
+            webClient.close();
+        }
+
         return Collections.max(pageNumber);
     }
 
@@ -266,6 +330,7 @@ public class YellowPages {
         MySQLUtils util = new MySQLUtils();
         String url = "";
         String category = "";
+        String name = "";
         for(HtmlAnchor link : links) {
             StyleElement style = link.getStyleMap().get("color");
             if (style != null &&
@@ -273,9 +338,10 @@ public class YellowPages {
                     style.getValue().equalsIgnoreCase("#333"))) {
                 url = link.getHrefAttribute().toString();
                 category = extractDigitsFromString(url);
+                name = link.asText();
                 System.out.println(url);
                 if(!util.checkCategoryExists(category))
-                    util.insertCategory(category, url);
+                    util.insertCategory(category, url, name);
             }
         }
     }
@@ -294,8 +360,8 @@ public class YellowPages {
             }
             handleIndustries();
         }
-        catch (IOException ex) {}
-        catch (SQLException ex) {}
+        catch (IOException ex) {System.out.println(ex.getMessage());}
+        catch (SQLException ex) {System.out.println(ex.getMessage());}
         finally {
             webClient.close();
         }
