@@ -18,8 +18,9 @@ import java.util.regex.Pattern;
 public class VinaBiz {
     static Integer count = 0;
     public static void main(String[] args) throws Exception {
+        //crawlCityName();
+        Helper.setupLogging();
         getCityName();
-        //Helper.setupLogging();
 
         //handleSpecifyIndustry("https://vinabiz.org/categories/business/nong-nghiep-lam-nghiep-thuy-san/300031003000300030003000", "thuy san");
         //WebClient webClient = new WebClient();
@@ -27,26 +28,38 @@ public class VinaBiz {
         //getPageContent();
     }
 
-    public static void getCityName() throws IOException, SQLException {
+    public static void crawlCityName() throws IOException, SQLException {
         WebClient webClient = new WebClient(BrowserVersion.CHROME);
         webClient.getOptions().setJavaScriptEnabled(false);
 
         HtmlPage containerIndustryPage = webClient.getPage("https://vinabiz.org/categories/tinhthanh");
         List<HtmlAnchor> links = containerIndustryPage.getByXPath("//div[@class='widget-body no-padding padding-left-5 padding-bottom-5 padding-right-5 padding-top-5']//a");
+        MySQLUtils util = new MySQLUtils();
         for(HtmlAnchor link: links) {
-            handleSpecifyCity(link.getHrefAttribute(), link.getChildNodes().get(1).asText());
+            util.insertCity(link.getChildNodes().get(1).asText(),link.getHrefAttribute());
         }
     }
-    private static void handleSpecifyCity(String url, String cityName) {
+
+    public static void getCityName() throws SQLException {
+        MySQLUtils util = new MySQLUtils();
+        List<City> cities = util.getCities();
+        for(City city : cities) {
+            handleSpecifyCity(city.Url,city.CityName, city.CrawledNumber);
+        }
+    }
+
+    private static void handleSpecifyCity(String url, String cityName, Integer crawled) {
         System.out.println("Processing an city " + url );
         WebClient webClient = new WebClient(BrowserVersion.CHROME);
         webClient.getOptions().setJavaScriptEnabled(false);
         webClient.getOptions().setCssEnabled(false);
+        MySQLUtils util = new MySQLUtils();
         try {
             Integer maxPageNumber = getPaging(webClient, url);
             System.out.println("max page" + maxPageNumber);
-            for (int i = 1; i <= maxPageNumber; i++) {
+            for (int i = crawled + 1; i <= maxPageNumber; i++) {
                handleEachPageInCity(webClient, url, i, cityName);
+               util.updateCrawledPageNumber(url, i);
             }
         }
         catch (IOException ex) {System.out.println(ex.getMessage());}

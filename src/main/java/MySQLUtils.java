@@ -8,12 +8,12 @@ import java.util.List;
  */
 public class MySQLUtils {
 //    String url = "jdbc:mysql://127.0.0.1:3306/cp";
-//    //String url = "jdbc:mysql://127.0.0.1:3306/crawling";
+     String url = "jdbc:mysql://127.0.0.1:3306/crawling";
 //    String driver = "com.mysql.jdbc.Driver";
 //    String username = "root";
 //    String password = "123@123a";
 
-    String url = "jdbc:mysql://127.0.0.1:3306/crawling?useUnicode=yes&characterEncoding=UTF-8";
+    //String url = "jdbc:mysql://127.0.0.1:3306/crawling?useUnicode=yes&characterEncoding=UTF-8";
     String driver = "com.mysql.jdbc.Driver";
     String username = "root";
     String password = "123456";
@@ -343,6 +343,26 @@ public class MySQLUtils {
         return companies;
     }
 
+    public ArrayList<City> getCities() throws SQLException {
+
+        Connection connection = DriverManager.getConnection(url, username, password);
+        ArrayList<City> cities = new ArrayList<City>();
+        try {
+            Class.forName(driver);
+            String sql ="SELECT name, url, crawled_page FROM city";
+            PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet result = statement.executeQuery();
+            while (result.next())
+                cities.add(new City(result.getString(1), result.getString(2), result.getInt(3)));
+        }
+        catch (SQLException e) {
+            throw e;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally  {    connection.close(); }
+        return cities;
+    }
+
     public void updateCompanyDetail(Integer id, String nguoi_lien_he, String chuc_vu, String di_dong,
                                     String email, String dien_thoai) throws SQLException {
         Connection connection = DriverManager.getConnection(url, username, password);
@@ -357,6 +377,42 @@ public class MySQLUtils {
             ps.setString(5, dien_thoai);
             ps.setInt(6, id);
             ps.executeUpdate();
+        }
+        catch (SQLException e) {
+            throw e;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally  {    connection.close(); }
+    }
+
+    public void insertCity(String name, String cityUrl) throws SQLException {
+        Connection connection = DriverManager.getConnection(url, username, password);
+        try {
+            Class.forName(driver);
+            String sql ="INSERT city(name, url) values(?, ?)";
+            PreparedStatement ps =
+                    connection.prepareStatement(sql);
+            ps.setString(1, name);
+            ps.setString(2, cityUrl);
+            ps.execute();
+        }
+        catch (SQLException e) {
+            throw e;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally  {    connection.close(); }
+    }
+
+    public void updateCrawledPageNumber(String cityUrl, int pageNumber) throws SQLException {
+        Connection connection = DriverManager.getConnection(url, username, password);
+        try {
+            Class.forName(driver);
+            String sql ="UPDATE city SET crawled_page=? where url=?";
+            PreparedStatement ps =
+                    connection.prepareStatement(sql);
+            ps.setInt(1, pageNumber);
+            ps.setString(2, cityUrl);
+            ps.execute();
         }
         catch (SQLException e) {
             throw e;
