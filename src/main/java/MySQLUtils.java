@@ -8,12 +8,12 @@ import java.util.List;
  */
 public class MySQLUtils {
 //    String url = "jdbc:mysql://127.0.0.1:3306/cp";
-     String url = "jdbc:mysql://127.0.0.1:3306/crawling";
+//     String url = "jdbc:mysql://127.0.0.1:3306/crawling";
 //    String driver = "com.mysql.jdbc.Driver";
 //    String username = "root";
 //    String password = "123@123a";
 
-    //String url = "jdbc:mysql://127.0.0.1:3306/crawling?useUnicode=yes&characterEncoding=UTF-8";
+    String url = "jdbc:mysql://127.0.0.1:3306/crawling?useUnicode=yes&characterEncoding=UTF-8";
     String driver = "com.mysql.jdbc.Driver";
     String username = "root";
     String password = "123456";
@@ -64,12 +64,12 @@ public class MySQLUtils {
     }
 
     public void insertDailyShare(int companyId,
-                            int session,
-                            Double open,
-                            Double high,
-                            Double low,
-                            Double close,
-                            BigInteger volume
+                                 int session,
+                                 Double open,
+                                 Double high,
+                                 Double low,
+                                 Double close,
+                                 BigInteger volume
 
     ) throws SQLException {
         Connection connection = DriverManager.getConnection(url, username, password);
@@ -288,13 +288,13 @@ public class MySQLUtils {
         ArrayList<Category> categories = new ArrayList<Category>();
         try {
             Class.forName(driver);
-            String sql ="SELECT url,category_id, max_page, name FROM category where id  > 137"; // 128, 137 need recrawl
+            String sql ="SELECT url,category_id, max_page, name FROM category where id  >= 1496"; // 128, 137 need recrawl
             PreparedStatement statement =
                     connection.prepareStatement(sql);
             ResultSet result = statement.executeQuery();
             while (result.next())
-                 categories.add(new Category(result.getString(1), result.getString(2)
-                         , result.getInt(3), result.getString(4)));
+                categories.add(new Category(result.getString(1), result.getString(2)
+                        , result.getInt(3), result.getString(4)));
 
         }
         catch (SQLException e) {
@@ -341,6 +341,47 @@ public class MySQLUtils {
             e.printStackTrace();
         } finally  {    connection.close(); }
         return companies;
+    }
+
+    public ArrayList<ShopifyPixel> getShopifySites() throws SQLException {
+
+        Connection connection = DriverManager.getConnection(url, username, password);
+        ArrayList<ShopifyPixel> shopifyPixels = new ArrayList<ShopifyPixel>();
+        try {
+            Class.forName(driver);
+            //String sql ="SELECT id, url, pixels FROM shopify_pixel where id > 60702"; // 32450
+            String sql = "SELECT  * FROM crawling.shopify_pixel where is_failed = 1 and id > 30000 and error_message not like  '%404 Not Found%' and error_message not like '%402 Payment Required%' ";
+            PreparedStatement statement =
+                    connection.prepareStatement(sql);
+            ResultSet result = statement.executeQuery();
+            while (result.next())
+                shopifyPixels.add(new ShopifyPixel(result.getInt(1), result.getString(2), result.getString(3)));
+        }
+        catch (SQLException e) {
+            throw e;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally  {    connection.close(); }
+        return shopifyPixels;
+    }
+
+    public void updateShopifyPixel(Integer id, String pixels, Integer failed, String errorMessage) throws SQLException {
+        Connection con = DriverManager.getConnection(url, username, password);
+
+        try {
+            String sql ="update shopify_pixel set pixels= ?, crawled_date=?, is_failed=?, error_message=? where id=?";
+            PreparedStatement ps =
+                    con.prepareStatement(sql);
+            ps.setString(1, pixels);
+            ps.setLong(2, System.currentTimeMillis());
+            ps.setInt(3, failed);
+            ps.setString(4, errorMessage);
+            ps.setInt(5, id);
+
+            ps.executeUpdate();
+        }
+        catch (SQLException e) { throw e; }
+        finally  {    con.close(); }
     }
 
     public ArrayList<City> getCities() throws SQLException {
@@ -419,5 +460,77 @@ public class MySQLUtils {
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } finally  {    connection.close(); }
+    }
+
+    public int getCrawledMyIPPage() throws SQLException {
+        Connection connection = DriverManager.getConnection(url, username, password);
+        try {
+            Class.forName(driver);
+            String sql ="SELECT crawled_page FROM shopify";
+            PreparedStatement statement =
+                    connection.prepareStatement(sql);
+            ResultSet result = statement.executeQuery();
+            while (result.next())
+                return result.getInt(1);
+
+        }
+        catch (SQLException e) {
+            throw e;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally  {    connection.close(); }
+        return 0;
+    }
+
+    public void updateCrawledMyIpPage(int crawledPage) throws SQLException {
+        Connection connection = DriverManager.getConnection(url, username, password);
+        try {
+            Class.forName(driver);
+            String sql ="update shopify set crawled_page =" + crawledPage;
+            PreparedStatement statement =
+                    connection.prepareStatement(sql);
+            statement.execute(sql);
+        }
+        catch (SQLException e) {
+            throw e;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally  {    connection.close(); }
+    }
+
+
+
+    public boolean checkShopifyUrlExist(String siteUrl) throws SQLException {
+        Connection con = DriverManager.getConnection(url, username, password);
+        try {
+            PreparedStatement ps =
+                    con.prepareStatement
+                            ("SELECT 1 FROM shopify_pixel WHERE url = ?");
+            ps.setString(1, siteUrl);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        catch (SQLException e) { throw e; }
+        finally  {    con.close(); }
+
+    }
+
+    public void insertShopify(String siteUrl) throws SQLException {
+        Connection con = DriverManager.getConnection(url, username, password);
+        String query = "INSERT INTO shopify_pixel(url) values(?)";
+        try {
+            PreparedStatement ps =
+                    con.prepareStatement
+                            (query);
+            ps.setString(1, siteUrl);
+            ps.execute();
+        }
+        catch (SQLException e) { throw e; }
+        finally  {    con.close(); }
     }
 }
